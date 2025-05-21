@@ -1,0 +1,13 @@
+{
+  "name": "slack-user-activity-notifier",
+  "version": "1.0.0",
+  "description": "Slack app that notifies channels about user activity",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^3.17.0",
+    "dotenv": "^16.3.1"
+  }
+} 
