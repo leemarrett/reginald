@@ -1,4 +1,4 @@
-# Slack User Activity Notifier
+# Reginald, aka Slack User Activity Notifier
 
 This Slack app sends notifications to a specified channel whenever a user joins, reactivates, or deactivates their account.
 
