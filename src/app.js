@@ -102,8 +102,43 @@ app.event('user_change', async ({ event, client }) => {
   }
 });
 
+// Error handling for the app
+app.error(async (error) => {
+  console.error('App error:', error);
+});
+
+// Handle WebSocket errors
+app.client.on('error', async (error) => {
+  console.error('WebSocket error:', error);
+});
+
+// Handle WebSocket close events
+app.client.on('close', async () => {
+  console.log('WebSocket connection closed. Attempting to reconnect...');
+  try {
+    await app.start();
+    console.log('Successfully reconnected to Slack!');
+  } catch (error) {
+    console.error('Failed to reconnect:', error);
+    // Wait 5 seconds before trying to reconnect
+    setTimeout(async () => {
+      try {
+        await app.start();
+        console.log('Successfully reconnected to Slack after retry!');
+      } catch (retryError) {
+        console.error('Failed to reconnect after retry:', retryError);
+      }
+    }, 5000);
+  }
+});
+
 // Start the app
 (async () => {
-  await app.start();
-  console.log('⚡️ Bolt app is running!');
+  try {
+    await app.start();
+    console.log('⚡️ Bolt app is running!');
+  } catch (error) {
+    console.error('Failed to start app:', error);
+    process.exit(1);
+  }
 })(); 
