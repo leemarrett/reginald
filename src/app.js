@@ -17,13 +17,13 @@ app.event('team_join', async ({ event, client }) => {
   try {
     await client.chat.postMessage({
       channel: process.env.NOTIFICATION_CHANNEL,
-      text: `🎉 Welcome <@${event.user.id}> to the workspace!`,
+      text: `🎉 <@${event.user.id}> joined Aucklandia!`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `🎉 Welcome <@${event.user.id}> to the workspace!`
+            text: `🎉 <@${event.user.id}> joined Aucklandia!`
           }
         }
       ]
@@ -85,13 +85,13 @@ app.event('user_change', async ({ event, client }) => {
     try {
       await client.chat.postMessage({
         channel: process.env.NOTIFICATION_CHANNEL,
-        text: `👋 <@${event.user.id}> has deactivated their account.`,
+        text: `👋 <@${event.user.id}> has deactivated their account. Stink.`,
         blocks: [
           {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `👋 <@${event.user.id}> has deactivated their account.`
+              text: `👋 <@${event.user.id}> has deactivated their account. Stink.`
             }
           }
         ]
