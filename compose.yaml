@@ -1,0 +1,21 @@
+services:
+  slack-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rego-slack-bot
+    restart: unless-stopped
+    environment:
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+      - NOTIFICATION_CHANNEL=${NOTIFICATION_CHANNEL}
+    volumes:
+      - ./src:/app/src:ro
+    # Uncomment the following if you need to debug or access logs
+    # logging:
+    #   driver: "json-file"
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "3"
+
