@@ -14,6 +14,7 @@ services:
       - .env
     volumes:
       - ./src:/app/src:ro
+      - ./data:/app/data
     # Uncomment the following if you need to debug or access logs
     # logging:
     #   driver: "json-file"

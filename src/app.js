@@ -43,6 +43,12 @@ function saveUserStates(map) {
 // Track user states (loaded from disk on startup)
 const userStates = loadUserStates();
 
+// Ensure data directory exists at startup (so it's there even before first save, and works with Docker volume mount)
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  console.log('Created data directory:', DATA_DIR);
+}
+
 // Handle user joined event
 app.event('team_join', async ({ event, client }) => {
   try {
