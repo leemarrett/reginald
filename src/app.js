@@ -49,11 +49,16 @@ if (!fs.existsSync(DATA_DIR)) {
   console.log('Created data directory:', DATA_DIR);
 }
 
-// Handle user joined event
+// Handle user joined workspace (team_join = workspace join, not channel join)
 app.event('team_join', async ({ event, client }) => {
+  const channel = process.env.NOTIFICATION_CHANNEL;
+  if (!channel) {
+    console.error('NOTIFICATION_CHANNEL is not set; cannot post join message');
+    return;
+  }
   try {
     await client.chat.postMessage({
-      channel: process.env.NOTIFICATION_CHANNEL,
+      channel,
       text: `🎉 <@${event.user.id}> joined Aucklandia!`,
       blocks: [
         {
@@ -65,8 +70,9 @@ app.event('team_join', async ({ event, client }) => {
         }
       ]
     });
+    console.log('Posted join message for', event.user.id, 'to channel', channel);
   } catch (error) {
-    console.error('Error sending welcome message:', error);
+    console.error('Error sending welcome message to', channel, ':', error.message, error);
   }
 });
 
