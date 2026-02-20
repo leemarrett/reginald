@@ -3,6 +3,11 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+// Log with ISO timestamp so Dockge/logs show when things happened
+const ts = () => new Date().toISOString();
+const log = (...args) => console.log(ts(), ...args);
+const logError = (...args) => console.error(ts(), ...args);
+
 // Initialize the Slack app
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -23,7 +28,7 @@ function loadUserStates() {
       return new Map(Object.entries(obj));
     }
   } catch (err) {
-    console.error('Error loading user states:', err);
+    logError('Error loading user states:', err);
   }
   return new Map();
 }
@@ -36,7 +41,7 @@ function saveUserStates(map) {
     const obj = Object.fromEntries(map);
     fs.writeFileSync(USER_STATES_PATH, JSON.stringify(obj, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error saving user states:', err);
+    logError('Error saving user states:', err);
   }
 }
 
@@ -46,14 +51,14 @@ const userStates = loadUserStates();
 // Ensure data directory exists at startup (so it's there even before first save, and works with Docker volume mount)
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  console.log('Created data directory:', DATA_DIR);
+  log('Created data directory:', DATA_DIR);
 }
 
 // Handle user joined workspace (team_join = workspace join, not channel join)
 app.event('team_join', async ({ event, client }) => {
   const channel = process.env.NOTIFICATION_CHANNEL;
   if (!channel) {
-    console.error('NOTIFICATION_CHANNEL is not set; cannot post join message');
+    logError('NOTIFICATION_CHANNEL is not set; cannot post join message');
     return;
   }
   try {
@@ -70,31 +75,30 @@ app.event('team_join', async ({ event, client }) => {
         }
       ]
     });
-    console.log('Posted join message for', event.user.id, 'to channel', channel);
+    log('Posted join message for', event.user.id, 'to channel', channel);
   } catch (error) {
-    console.error('Error sending welcome message to', channel, ':', error.message, error);
+    logError('Error sending welcome message to', channel, ':', error.message, error);
   }
 });
 
 // Handle user_change: reactivations and deactivations (state persisted so we detect reactivations after app restarts)
 app.event('user_change', async ({ event, client }) => {
-  console.log('User change event received:', {
-    userId: event.user.id,
-    isDeleted: event.user.deleted,
-    isRestricted: event.user.is_restricted,
-    previousState: userStates.get(event.user.id)
-  });
-
   const previousState = userStates.get(event.user.id);
+  // Normalise to booleans; if Slack omits deleted/is_restricted, keep previous state so we don't overwrite
+  const deleted = event.user.deleted === true ? true : event.user.deleted === false ? false : (previousState?.deleted ?? false);
+  const isRestricted = event.user.is_restricted === true;
+
+  log('User change:', { userId: event.user.id, deleted, isRestricted, previousDeleted: previousState?.deleted });
+
   const currentState = {
-    deleted: event.user.deleted,
-    isRestricted: event.user.is_restricted,
+    deleted,
+    isRestricted,
     timestamp: Date.now()
   };
 
   // Reactivation: user is now active and we had them as deleted (from memory or persisted state)
   if (currentState.deleted === false && previousState?.deleted === true) {
-    console.log('Reactivation detected for user:', event.user.id);
+    log('Reactivation detected for user:', event.user.id);
     try {
       await client.chat.postMessage({
         channel: process.env.NOTIFICATION_CHANNEL,
@@ -110,7 +114,7 @@ app.event('user_change', async ({ event, client }) => {
         ]
       });
     } catch (error) {
-      console.error('Error sending reactivation message:', error);
+      logError('Error sending reactivation message:', error);
     }
   }
 
@@ -131,7 +135,7 @@ app.event('user_change', async ({ event, client }) => {
         ]
       });
     } catch (error) {
-      console.error('Error sending deactivation message:', error);
+      logError('Error sending deactivation message:', error);
     }
   }
 
@@ -142,32 +146,39 @@ app.event('user_change', async ({ event, client }) => {
 
 // Error handling for the app
 app.error(async (error) => {
-  console.error('App error:', error);
+  logError('App error:', error);
 });
 
 // Handle WebSocket errors
 app.client.on('error', async (error) => {
-  console.error('WebSocket error:', error);
+  logError('WebSocket error:', error);
 });
 
 // Handle WebSocket close events
 app.client.on('close', async () => {
-  console.log('WebSocket connection closed. Attempting to reconnect...');
+  log('WebSocket connection closed. Attempting to reconnect...');
   try {
     await app.start();
-    console.log('Successfully reconnected to Slack!');
+    log('Successfully reconnected to Slack!');
   } catch (error) {
-    console.error('Failed to reconnect:', error);
+    logError('Failed to reconnect:', error);
     // Wait 5 seconds before trying to reconnect
     setTimeout(async () => {
       try {
         await app.start();
-        console.log('Successfully reconnected to Slack after retry!');
+        log('Successfully reconnected to Slack after retry!');
       } catch (retryError) {
-        console.error('Failed to reconnect after retry:', retryError);
+        logError('Failed to reconnect after retry:', retryError);
       }
     }, 5000);
   }
+});
+
+// Socket-mode can throw "Unhandled event 'server explicit disconnect' in state 'connecting'" when
+// Slack disconnects during connection; we log and exit so the container restarts cleanly.
+process.on('uncaughtException', (err) => {
+  logError('Uncaught exception (process will exit):', err.message || err);
+  process.exit(1);
 });
 
 // Seed user state from Slack on startup so we detect reactivations of members who were deactivated before the app ran
@@ -193,10 +204,10 @@ async function seedDeletedUsersFromSlack() {
     } while (cursor);
     if (totalSeeded > 0) {
       saveUserStates(userStates);
-      console.log('Seeded', totalSeeded, 'deactivated user(s) from Slack');
+      log('Seeded', totalSeeded, 'deactivated user(s) from Slack');
     }
   } catch (err) {
-    console.error('Error seeding deleted users from Slack:', err);
+    logError('Error seeding deleted users from Slack:', err);
   }
 }
 
@@ -204,10 +215,10 @@ async function seedDeletedUsersFromSlack() {
 (async () => {
   try {
     await app.start();
-    console.log('⚡️ Bolt app is running!');
+    log('⚡️ Bolt app is running!');
     await seedDeletedUsersFromSlack();
   } catch (error) {
-    console.error('Failed to start app:', error);
+    logError('Failed to start app:', error);
     process.exit(1);
   }
 })(); 
