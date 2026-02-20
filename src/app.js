@@ -175,8 +175,18 @@ app.client.on('close', async () => {
 });
 
 // Socket-mode can throw "Unhandled event 'server explicit disconnect' in state 'connecting'" when
-// Slack disconnects during connection; we log and exit so the container restarts cleanly.
+// Slack disconnects during the connection handshake (transient). Handle it so we don't treat it as a crash.
+const isTransientSlackDisconnect = (err) => {
+  const msg = (err && (err.message || String(err))) || '';
+  return msg.includes("server explicit disconnect") && msg.includes("connecting");
+};
+
 process.on('uncaughtException', (err) => {
+  if (isTransientSlackDisconnect(err)) {
+    log('Transient Slack disconnect during connect; exiting in 2s so process can restart and reconnect.');
+    setTimeout(() => process.exit(0), 2000);
+    return;
+  }
   logError('Uncaught exception (process will exit):', err.message || err);
   process.exit(1);
 });
